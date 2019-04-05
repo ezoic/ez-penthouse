@@ -1,7 +1,7 @@
 {
-  "name": "penthouse",
+  "name": "ez-penthouse",
   "description": "Generate critical path CSS for web pages",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "homepage": "https://github.com/pocketjoso/penthouse",
   "author": {
     "name": "Jonas Ohlsson Aden",
@@ -26,7 +26,7 @@
     "test-all": "jest test/*.test.js && yarn test-extra && yarn test-perf",
     "test-perf": "jest  --runInBand test/run-sequential/perf.test.js",
     "test-extra": "jest --runInBand test/run-sequential/node-module.test.js",
-    "prepare": "npm run lint && npm run transpile",
+    "install": "npm run lint && npm run transpile",
     "transpile": "babel -d lib src/"
   },
   "lint-staged": {
@@ -40,9 +40,7 @@
     "css-tree": "1.0.0-alpha.28",
     "debug": "^4.1.1",
     "jsesc": "^2.5.2",
-    "puppeteer": "1.13.0"
-  },
-  "devDependencies": {
+    "puppeteer": "1.13.0",
     "babel-cli": "^6.26.0",
     "babel-core": "^6.26.3",
     "babel-jest": "^24.5.0",
@@ -72,7 +70,10 @@
     "chrome:headless"
   ],
   "files": [
-    "lib/**/*.js"
+    "lib",
+    "src",
+    ".eslintrc",
+    ".eslintignore"
   ],
   "babel": {
     "presets": [
