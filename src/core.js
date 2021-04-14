@@ -139,6 +139,7 @@ function setupRequestChecker (
     }
 
     // block any request that exists within the list of requests to block
+    blockRequestURLs = blockRequestURLs || {}
     for (let i = 0; i < blockRequestURLs.length; i++) {
       let rurl = blockRequestURLs[i]
       if (interceptedRequest.url().match(rurl)) {
@@ -306,7 +307,7 @@ async function preparePage ({
     setUserAgentPromise,
     setCustomPageHeadersPromise,
     setCookiesPromise,
-    blockJSRequestsPromise
+    requestPromise
   ]).then(() => {
     debuglog('preparePage DONE')
     return page
