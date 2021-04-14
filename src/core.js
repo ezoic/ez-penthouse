@@ -141,7 +141,7 @@ function setupRequestChecker (
     // block any request that exists within the list of requests to block
     blockRequestURLs = blockRequestURLs || {}
     for (let i = 0; i < blockRequestURLs.length; i++) {
-      let rurl = blockRequestURLs[i]
+      const rurl = blockRequestURLs[i]
       if (interceptedRequest.url().match(rurl)) {
         debuglog('blocking request; exists in block request urls')
         interceptedRequest.abort()
@@ -267,10 +267,9 @@ async function preparePage ({
   // Penthouse tracks these internally instead.
   page.setDefaultNavigationTimeout(0)
 
-  let requestPromise
   // NOTE: with JS disabled we cannot use JS timers inside page.evaluate
   // (setTimeout, setInterval), however requestAnimationFrame works.
-  requestPromise = Promise.all([
+  const requestPromise = Promise.all([
     page.setJavaScriptEnabled(blockJSRequests === false),
     setupRequestChecker(
       page,
