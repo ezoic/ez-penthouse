@@ -12,24 +12,31 @@ const PUPPETEER_PAGE_UNLOADED_DURING_EXECUTION_ERROR_REGEX = /(Cannot find conte
 export const PAGE_UNLOADED_DURING_EXECUTION_ERROR_MESSAGE =
   'PAGE_UNLOADED_DURING_EXECUTION: Critical css generation script could not be executed.\n\nThis can happen if Penthouse was killed during execution, OR otherwise most commonly if the page navigates away after load, via setting window.location, meta tag refresh directive or similar. For the critical css generation to work the loaded page must stay: remove any redirects or move them to the server. You can also disable them on your end just for the critical css generation, for example via a query parameter.'
 
-function blockinterceptedRequests (interceptedRequest) {
-  const isJsRequest = /\.js(\?.*)?$/.test(interceptedRequest.url())
-  if (isJsRequest) {
-    interceptedRequest.abort()
-  } else {
-    interceptedRequest.continue()
-  }
-}
-
 function loadPage (
   page,
   url,
+  htmlContentURL,
+  isHTMLWithURL,
   timeout,
   pageLoadSkipTimeout,
   allowedResponseCode
 ) {
   debuglog('page load start')
   let waitingForPageLoad = true
+
+  // change the url to the html content url - the request will be intercepted and the html will be changed within
+  // the request interception method
+  if (isHTMLWithURL === true) {
+    debuglog(
+      'changing url [',
+      url,
+      '] to the htmlcontenturl [',
+      htmlContentURL,
+      ']'
+    )
+    url = htmlContentURL
+  }
+
   let loadPagePromise = page.goto(url)
   if (pageLoadSkipTimeout) {
     loadPagePromise = Promise.race([
@@ -91,8 +98,58 @@ function checkResponseStatus (allowedResponseCode, response) {
   }
 }
 
-function setupBlockJsRequests (page) {
-  page.on('request', blockinterceptedRequests)
+function setupRequestChecker (
+  page,
+  blockJSRequests,
+  blockRequestURLs,
+  html,
+  htmlContentURL,
+  isHTMLWithURL
+) {
+  page.on('request', interceptedRequest => {
+    debuglog(
+      'intercepted request - ',
+      interceptedRequest.url().substring(0, 150)
+    )
+
+    // if the requesed url matches the html content url AND it is an html request with a url
+    // do not do requests that are src requests (this is only for situations when html is passed
+    // in with a url for relative paths)
+    if (isHTMLWithURL === true) {
+      if (
+        interceptedRequest.url() === htmlContentURL ||
+        interceptedRequest.url() === htmlContentURL + '/'
+      ) {
+        debuglog('intercepting url and replacing with html', htmlContentURL)
+        interceptedRequest.respond({
+          body: html
+        })
+        return
+      }
+    }
+
+    // if we want to block all js requests
+    if (blockJSRequests === true) {
+      const isJsRequest = /\.js(\?.*)?$/.test(interceptedRequest.url())
+      if (isJsRequest) {
+        debuglog('blocking request; blocking all js requests')
+        interceptedRequest.abort()
+        return
+      }
+    }
+
+    // block any request that exists within the list of requests to block
+    for (let i = 0; i < blockRequestURLs.length; i++) {
+      let rurl = blockRequestURLs[i]
+      if (interceptedRequest.url().match(rurl)) {
+        debuglog('blocking request; exists in block request urls')
+        interceptedRequest.abort()
+        return
+      }
+    }
+
+    interceptedRequest.continue()
+  })
   return page.setRequestInterception(true)
 }
 
@@ -123,6 +180,10 @@ async function astFromCss ({ cssString, strict }) {
 async function preparePage ({
   page,
   pagePromise,
+  blockRequestURLs,
+  html,
+  htmlContentURL,
+  isHTMLWithURL,
   width,
   height,
   cookies,
@@ -205,17 +266,22 @@ async function preparePage ({
   // Penthouse tracks these internally instead.
   page.setDefaultNavigationTimeout(0)
 
-  let blockJSRequestsPromise
-  if (blockJSRequests) {
-    // NOTE: with JS disabled we cannot use JS timers inside page.evaluate
-    // (setTimeout, setInterval), however requestAnimationFrame works.
-    blockJSRequestsPromise = Promise.all([
-      page.setJavaScriptEnabled(false),
-      setupBlockJsRequests(page)
-    ]).then(() => {
-      debuglog('blocking js requests DONE')
-    })
-  }
+  let requestPromise
+  // NOTE: with JS disabled we cannot use JS timers inside page.evaluate
+  // (setTimeout, setInterval), however requestAnimationFrame works.
+  requestPromise = Promise.all([
+    page.setJavaScriptEnabled(blockJSRequests === false),
+    setupRequestChecker(
+      page,
+      blockJSRequests,
+      blockRequestURLs,
+      html,
+      htmlContentURL,
+      isHTMLWithURL
+    )
+  ]).then(() => {
+    debuglog('blocking js requests DONE')
+  })
 
   page.on('error', error => {
     debuglog('page error: ' + error)
@@ -267,6 +333,10 @@ async function grabPageScreenshot ({
 async function pruneNonCriticalCssLauncher ({
   pagePromise,
   url,
+  html,
+  htmlContentURL,
+  blockRequestURLs,
+  isHTMLWithURL,
   cssString,
   width,
   height,
@@ -357,6 +427,10 @@ async function pruneNonCriticalCssLauncher ({
     const updatedPagePromise = preparePage({
       page,
       pagePromise,
+      blockRequestURLs,
+      html,
+      htmlContentURL,
+      isHTMLWithURL,
       width,
       height,
       userAgent,
@@ -398,6 +472,8 @@ async function pruneNonCriticalCssLauncher ({
     const loadPagePromise = loadPage(
       page,
       url,
+      htmlContentURL,
+      isHTMLWithURL,
       timeout,
       pageLoadSkipTimeout,
       allowedResponseCode

@@ -72,6 +72,11 @@ const generateCriticalCssWrapped = async function generateCriticalCssWrapped (
   const width = parseInt(options.width || DEFAULT_VIEWPORT_WIDTH, 10)
   const height = parseInt(options.height || DEFAULT_VIEWPORT_HEIGHT, 10)
   const timeoutWait = options.timeout || DEFAULT_TIMEOUT
+  const isHTMLWithURL =
+    typeof options.html !== 'undefined' &&
+    typeof options.htmlContentURL !== 'undefined' &&
+    options.html !== '' &&
+    options.htmlContentURL !== ''
   // Merge properties with default ones
   const propertiesToRemove =
     options.propertiesToRemove || DEFAULT_PROPERTIES_TO_REMOVE
@@ -96,6 +101,10 @@ const generateCriticalCssWrapped = async function generateCriticalCssWrapped (
     formattedCss = await generateCriticalCss({
       pagePromise,
       url: options.url,
+      html: options.html,
+      htmlContentURL: options.htmlContentURL,
+      blockRequestURLs: options.blockRequestURLs,
+      isHTMLWithURL: isHTMLWithURL,
       cssString: options.cssString,
       width,
       height,
